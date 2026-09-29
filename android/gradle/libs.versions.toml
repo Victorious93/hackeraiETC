@@ -12,6 +12,7 @@ kotlinxSerializationJson = "1.7.3"
 coroutines = "1.10.1"
 droidcommandCoreHackerai = "0.1.0-SNAPSHOT"
 mockk = "1.13.14"
+securityCrypto = "1.1.0-alpha06"
 robolectric = "4.14.1"
 junit = "4.13.2"
 testExtJunit = "1.2.1"
@@ -35,6 +36,7 @@ robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "testExtJunit" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
+androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

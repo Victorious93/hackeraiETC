@@ -15,35 +15,37 @@ class HackerAIBoundService : Service() {
 
     private val binder =
         object : IHackerAIService.Stub() {
-            override fun runAgentTask(inputJson: String): String {
-                if (!dependencyGuard.isDcaInstalled()) {
-                    return errorJson("DroidCommand AI is not installed")
-                }
-                return agentTaskRunner.runTask(inputJson)
-            }
-
-            override fun getSkillCatalog(): String {
-                if (!dependencyGuard.isDcaInstalled()) {
-                    return errorJson("DroidCommand AI is not installed")
-                }
-                return agentTaskRunner.getSkillCatalog()
-            }
-
-            override fun validateFinding(candidateJson: String): String {
-                if (!dependencyGuard.isDcaInstalled()) {
-                    return errorJson("DroidCommand AI is not installed")
-                }
-                return agentTaskRunner.validateFinding(candidateJson)
-            }
-
-            override fun cancelTask(taskId: String) {
-                agentTaskRunner.cancelTask(taskId)
-            }
-
-            override fun healthCheck(): String = agentTaskRunner.healthCheck()
+            override fun runAgentTask(inputJson: String): String = this@HackerAIBoundService.runAgentTask(inputJson)
+            override fun getSkillCatalog(): String = this@HackerAIBoundService.getSkillCatalog()
+            override fun validateFinding(candidateJson: String): String = this@HackerAIBoundService.validateFinding(candidateJson)
+            override fun cancelTask(taskId: String) = agentTaskRunner.cancelTask(taskId)
+            override fun healthCheck(): String = this@HackerAIBoundService.healthCheck()
         }
 
     override fun onBind(intent: Intent): IBinder = binder
 
-    private fun errorJson(message: String): String = """{"error":"$message"}"""
+    fun runAgentTask(inputJson: String): String {
+        if (!dependencyGuard.isDcaInstalled()) return errorJson("DroidCommand AI is not installed")
+        return agentTaskRunner.runTask(inputJson)
+    }
+
+    fun getSkillCatalog(): String {
+        if (!dependencyGuard.isDcaInstalled()) return errorJson("DroidCommand AI is not installed")
+        return agentTaskRunner.getSkillCatalog()
+    }
+
+    fun validateFinding(candidateJson: String): String {
+        if (!dependencyGuard.isDcaInstalled()) return errorJson("DroidCommand AI is not installed")
+        return agentTaskRunner.validateFinding(candidateJson)
+    }
+
+    fun healthCheck(): String {
+        if (!dependencyGuard.isDcaInstalled()) return "dca_not_installed"
+        return agentTaskRunner.healthCheck()
+    }
+
+    private fun errorJson(message: String): String {
+        val escaped = message.replace("\\", "\\\\").replace("\"", "\\\"")
+        return """{"ok":false,"error":"$escaped"}"""
+    }
 }
