@@ -46,14 +46,17 @@ DCA: agentTool.invoke(inputJson)
 
 (Phase 5: full async task tracking with progress callbacks)
 
-## Component status
+## Component status (updated 2026-09-29, Phase 5)
 
-| Component                 | Status            | Notes                                                     |
-| ------------------------- | ----------------- | --------------------------------------------------------- |
-| IHackerAIService.aidl     | IMPLEMENTED       | JSON string transport; stable interface                   |
-| HackerAIBoundService      | IMPLEMENTED       | DependencyGuard + Hilt injection                          |
-| DependencyGuard           | IMPLEMENTED       | PackageManager check; tested with mockk                   |
-| AgentTaskRunner           | STUB              | Returns placeholder JSON; Phase 5 wires core-hackerai     |
-| StatusScreen              | IMPLEMENTED       | DCA connection state display                              |
-| HackerAINavHost           | STUB              | Placeholder; Phase 5 adds SkillBrowser + Settings screens |
-| core-hackerai integration | PLANNED (Phase 5) | Requires publishToMavenLocal                              |
+| Component                 | Status                             | Notes                                                                    |
+| ------------------------- | ---------------------------------- | ------------------------------------------------------------------------ |
+| IHackerAIService.aidl     | IMPLEMENTED                        | JSON string transport; stable interface                                  |
+| HackerAIBoundService      | IMPLEMENTED                        | DependencyGuard + Hilt injection; refactored to expose delegate methods  |
+| DependencyGuard           | IMPLEMENTED                        | PackageManager check; tested with mockk                                  |
+| AgentTaskRunner           | IMPLEMENTED — NOT RUNTIME VERIFIED | SkillCatalog, DoomLoopDetector, RuntimeRecovery, StepBudgetGate wired in |
+| LocalLlmProvider          | IMPLEMENTED — NOT RUNTIME VERIFIED | EncryptedSharedPreferences + HttpURLConnection; no Android SDK to build  |
+| StatusScreen              | IMPLEMENTED                        | DCA connection state display                                             |
+| SkillBrowserScreen        | IMPLEMENTED — NOT RUNTIME VERIFIED | TF-IDF search over SkillCatalog; LazyColumn with category badges         |
+| SettingsScreen            | IMPLEMENTED — NOT RUNTIME VERIFIED | API key (masked), model, endpoint inputs wired to LocalLlmProvider       |
+| HackerAINavHost           | IMPLEMENTED — NOT RUNTIME VERIFIED | Bottom nav: Status / Skills / Settings; real NavHost + NavController     |
+| core-hackerai integration | IMPLEMENTED — NOT RUNTIME VERIFIED | Requires `./gradlew :core-hackerai:publishToMavenLocal` before AGP build |
