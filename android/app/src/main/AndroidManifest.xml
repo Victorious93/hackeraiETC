@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="ai.droidcommand.permission.BIND_HACKERAI" />
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application
+        android:name=".HackerAIApp"
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.HackerAICompanion">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!--
+            protectionLevel="signature" is declared by DroidCommand AI.
+            Only apps signed with the same key as DCA can hold this permission
+            and therefore bind to this service. Third-party apps are rejected
+            at the OS level before any code in HackerAIBoundService runs.
+        -->
+        <service
+            android:name=".service.HackerAIBoundService"
+            android:exported="true"
+            android:permission="ai.droidcommand.permission.BIND_HACKERAI">
+            <intent-filter>
+                <action android:name="ai.hackerai.companion.IHackerAIService" />
+            </intent-filter>
+        </service>
+
+    </application>
+
+</manifest>

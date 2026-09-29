@@ -207,6 +207,14 @@ export const delegateTaskInputSchema = z
       .max(MAX_SUBAGENT_SKILLS)
       .nullable()
       .default(null),
+    skill_rationale: z
+      .string()
+      .trim()
+      .max(500)
+      .optional()
+      .describe(
+        "Optional annotation explaining why the chosen skills were selected for this task. Propagated to the subagent system prompt as skill selection context.",
+      ),
     capabilities: z
       .array(subagentCapabilityBundleSchema)
       .min(1)
