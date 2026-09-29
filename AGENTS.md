@@ -15,6 +15,18 @@ in `lib/api/agent-stream-runner.ts`. Trace both callers when changing that
 boundary. Local and desktop clients connect through separate sandbox transports;
 success on one transport does not prove the others work.
 
+This repo is also one of three planned companion apps in
+[`Victorious93/droidcommand-AI`](https://github.com/Victorious93/droidcommand-AI)'s
+Android app fleet (with `Victorious93/Pentest-Swarm-AI` and
+`Victorious93/VictorSuite`). That repo's `core-hackerai` module is a Kotlin
+port of this repo's subagent-orchestration logic under `lib/ai/subagents/`
+(contracts, doom-loop detection, provider-error retry, step-budget gating,
+the Strix skill catalog) — keep that logic's shape mirrorable when changing
+it, and see droidcommand-AI's `docs/ARCHITECTURE.md` §8 /
+`docs/AUDIT_2026-09-05.md` for what's actually wired up versus still
+planned (the AIDL companion binding this repo would need to expose does
+not exist yet).
+
 ## Code Design and Maintenance
 
 Prefer the smallest design that handles the actual requirement. Keep provider
