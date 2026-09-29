@@ -15,17 +15,27 @@ in `lib/api/agent-stream-runner.ts`. Trace both callers when changing that
 boundary. Local and desktop clients connect through separate sandbox transports;
 success on one transport does not prove the others work.
 
-This repo is also one of three planned companion apps in
+This repo is also one of three companion apps in
 [`Victorious93/droidcommand-AI`](https://github.com/Victorious93/droidcommand-AI)'s
 Android app fleet (with `Victorious93/Pentest-Swarm-AI` and
 `Victorious93/VictorSuite`). That repo's `core-hackerai` module is a Kotlin
 port of this repo's subagent-orchestration logic under `lib/ai/subagents/`
 (contracts, doom-loop detection, provider-error retry, step-budget gating,
 the Strix skill catalog) — keep that logic's shape mirrorable when changing
-it, and see droidcommand-AI's `docs/ARCHITECTURE.md` §8 /
-`docs/AUDIT_2026-09-05.md` for what's actually wired up versus still
-planned (the AIDL companion binding this repo would need to expose does
-not exist yet).
+it. **A 2026-09-29c scoping pass in that repo found AIDL isn't the right
+integration shape at all**, not just unbuilt: this repo has no Android
+presence (`packages/desktop` is a desktop-only Tauri wrapper around the
+web app), so there's no on-device component for droidcommand-AI to bind
+to. The real, already-shipped external-control mechanism,
+`packages/local` (`@hackerai/local`), runs the opposite direction — it
+lets *this app's own cloud Agent* drive a local executor, not an external
+caller drive this app. Letting droidcommand-AI delegate a security task
+here for real would need a new, API-key-authenticated way to start/poll
+an Agent run (`/api/agent-long/*` is currently gated by a WorkOS browser
+session cookie only, per `lib/auth/get-user-id.ts`) — a genuine design
+decision for this repo's own maintainers, not implied groundwork. See
+droidcommand-AI's `docs/ARCHITECTURE.md` §8 and `docs/AUDIT_2026-09-05.md`
+(2026-09-29c addendum) for the full record.
 
 ## Code Design and Maintenance
 
