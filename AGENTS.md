@@ -246,3 +246,58 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+## Android Companion APK (`android/`)
+
+`android/` is a standalone Android Gradle project that exposes HackerAI's
+agent capabilities to DroidCommand AI via an AIDL bound service. It lives
+inside this repo but is **not** part of the Next.js application — it has its
+own Gradle build, its own dependencies, and its own test suite.
+
+### Key constraints
+
+- **AIDL contract sync**: The AIDL files in
+  `android/app/src/main/aidl/ai/droidcommand/companion/` are **copies** of
+  the source of truth in `droidcommand-AI/core-companion/src/main/aidl/`.
+  Whenever `IHackerAIService.aidl` changes in `droidcommand-AI`, it must be
+  copied here and into `Pentest-Swarm-AI/android/` as well. A divergent AIDL
+  file breaks the binding at runtime (Binder mismatch exception), which is
+  hard to diagnose. Treat these files like a generated artifact: don't edit
+  them directly, copy from the source of truth.
+
+- **DCA dependency is mandatory**: `DependencyGuard` checks for
+  `ai.droidcommand.app` at every service call. All AIDL methods return
+  `{"ok":false,"error":"dca_not_installed"}` when DCA is absent. Do not
+  weaken or bypass this guard.
+
+- **`core-hackerai` from `mavenLocal()`**: The companion consumes
+  `ai.droidcommand:core-hackerai:0.1.0-SNAPSHOT` via `mavenLocal()`. Before
+  building the APK, run `./gradlew :core-hackerai:publishToMavenLocal` from
+  `droidcommand-AI/`. The version in `android/gradle/libs.versions.toml` must
+  match.
+
+- **No LLM keys in the APK**: `LocalLlmProvider` accepts an API key and
+  endpoint URL configured by the user at runtime via `SettingsScreen`. Keys
+  are stored in `EncryptedSharedPreferences` (Android Keystore). Do not
+  hard-code or bundle any LLM credentials.
+
+- **JVM-only tests**: `./gradlew :app:test` runs on any machine with a JDK.
+  No Android SDK or device required. Tests use mockk + Robolectric.
+
+### Build prerequisites (for the APK itself)
+
+1. Android SDK (API 35) + NDK
+2. `./gradlew :core-hackerai:publishToMavenLocal` from `droidcommand-AI/`
+3. `./gradlew :app:assembleDebug` from `android/`
+
+### What lives where
+
+| Path                                                         | Purpose                                                |
+| ------------------------------------------------------------ | ------------------------------------------------------ |
+| `android/app/src/main/aidl/`                                 | AIDL contracts (copy from `core-companion`)            |
+| `android/app/src/main/kotlin/ai/hackerai/companion/service/` | `HackerAIBoundService`, `AgentTaskRunner`              |
+| `android/app/src/main/kotlin/ai/hackerai/companion/llm/`     | `LocalLlmProvider` (HTTP-based, configurable endpoint) |
+| `android/app/src/main/kotlin/ai/hackerai/companion/ui/`      | Compose screens: Status, Skill Browser, Settings       |
+| `android/app/src/test/`                                      | JVM-only tests (mockk + Robolectric)                   |
+| `android/CLAUDE.md`                                          | Companion-specific session orientation                 |
+| `android/ARCHITECTURE.md`                                    | Component diagram and status table                     |
