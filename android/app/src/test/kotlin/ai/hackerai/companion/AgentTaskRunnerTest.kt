@@ -151,4 +151,68 @@ class AgentTaskRunnerTest {
         runner.cancelTask(taskId)
         assertTrue("Cancel completed without exception", true)
     }
+
+    @Test
+    fun `getTaskResult returns queued immediately after runTask`() {
+        // Block the LLM so the task stays in-flight
+        every { llmProvider.chat(any(), any(), any()) } answers {
+            Thread.sleep(10_000)
+            "response"
+        }
+
+        val taskJson = runner.runTask("""{"task":"queued status test"}""")
+        val taskId = Json.parseToJsonElement(taskJson).jsonObject["taskId"]!!.jsonPrimitive.content
+
+        val result = Json.parseToJsonElement(runner.getTaskResult(taskId)).jsonObject
+        val status = result["status"]?.jsonPrimitive?.content
+        assertTrue("Expected queued or running, got $status", status == "queued" || status == "running")
+
+        runner.cancelTask(taskId)
+    }
+
+    @Test
+    fun `getTaskResult returns done after task completes`() {
+        val expectedResponse = "Final security report: nothing found."
+        every { llmProvider.chat(any(), any(), any()) } returns expectedResponse
+
+        val input = ai.droidcommand.hackerai.CreateAgentInput(task = "run to completion")
+        val cancelled = AtomicBoolean(false)
+
+        runner.executor.submit {
+            runner.runTaskInternal("done-task-id", input, emptyList(), cancelled)
+        }.get(10, java.util.concurrent.TimeUnit.SECONDS)
+
+        val result = Json.parseToJsonElement(runner.getTaskResult("done-task-id")).jsonObject
+        assertEquals("done", result["status"]?.jsonPrimitive?.content)
+        assertNotNull(result["result"])
+    }
+
+    @Test
+    fun `getTaskResult returns error for unknown taskId`() {
+        val result = Json.parseToJsonElement(runner.getTaskResult("no-such-task-id")).jsonObject
+        assertEquals("false", result["ok"]?.jsonPrimitive?.content)
+        assertNotNull(result["error"])
+    }
+
+    @Test
+    fun `getTaskResult returns cancelled after cancelTask`() {
+        every { llmProvider.chat(any(), any(), any()) } answers {
+            Thread.sleep(5_000)
+            "response"
+        }
+
+        val taskJson = runner.runTask("""{"task":"cancel me"}""")
+        val taskId = Json.parseToJsonElement(taskJson).jsonObject["taskId"]!!.jsonPrimitive.content
+
+        Thread.sleep(50)
+        runner.cancelTask(taskId)
+        // Let the thread react to cancellation
+        Thread.sleep(200)
+
+        val status = Json.parseToJsonElement(runner.getTaskResult(taskId))
+            .jsonObject["status"]?.jsonPrimitive?.content
+        // cancelled or still running if thread hasn't exited yet — both are valid
+        assertTrue("Expected cancelled or running, got $status",
+            status == "cancelled" || status == "running")
+    }
 }

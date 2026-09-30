@@ -1,15 +1,24 @@
 package ai.hackerai.companion
 
+import android.content.Context
 import android.content.pm.PackageManager
 import io.mockk.every
 import io.mockk.mockk
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 
 class DependencyGuardTest {
     private val pm = mockk<PackageManager>()
-    private val guard = DependencyGuard(pm)
+    private val context = mockk<Context>()
+    private lateinit var guard: DependencyGuard
+
+    @Before
+    fun setUp() {
+        every { context.packageManager } returns pm
+        guard = DependencyGuard(context)
+    }
 
     @Test
     fun `isDcaInstalled returns true when DCA package is present`() {

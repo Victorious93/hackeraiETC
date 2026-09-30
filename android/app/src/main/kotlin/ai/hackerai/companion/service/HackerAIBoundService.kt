@@ -19,6 +19,7 @@ class HackerAIBoundService : Service() {
             override fun getSkillCatalog(): String = this@HackerAIBoundService.getSkillCatalog()
             override fun validateFinding(candidateJson: String): String = this@HackerAIBoundService.validateFinding(candidateJson)
             override fun cancelTask(taskId: String) = agentTaskRunner.cancelTask(taskId)
+            override fun getTaskResult(taskId: String): String = this@HackerAIBoundService.getTaskResult(taskId)
             override fun healthCheck(): String = this@HackerAIBoundService.healthCheck()
         }
 
@@ -37,6 +38,11 @@ class HackerAIBoundService : Service() {
     fun validateFinding(candidateJson: String): String {
         if (!dependencyGuard.isDcaInstalled()) return errorJson("DroidCommand AI is not installed")
         return agentTaskRunner.validateFinding(candidateJson)
+    }
+
+    fun getTaskResult(taskId: String): String {
+        if (!dependencyGuard.isDcaInstalled()) return errorJson("DroidCommand AI is not installed")
+        return agentTaskRunner.getTaskResult(taskId)
     }
 
     fun healthCheck(): String {

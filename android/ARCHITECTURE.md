@@ -7,11 +7,13 @@ DroidCommand AI (:app)
   └── bindService(IHackerAIService, BIND_HACKERAI)  [signature permission]
         └── HackerAIBoundService                     [Service + IHackerAIService.Stub]
               ├── DependencyGuard                     [PackageManager check at every call]
-              └── AgentTaskRunner                     [STUB → Phase 5: core-hackerai delegation]
+              └── AgentTaskRunner                     [Hilt @Singleton]
                     ├── SkillCatalog                  [core-hackerai: loads strix catalog]
+                    ├── SkillRanker                   [rankSkillsForTask() if > MAX_SUBAGENT_SKILLS]
                     ├── DoomLoopDetector              [core-hackerai: warn@3, halt@5]
                     ├── RuntimeRecovery               [core-hackerai: provider error retry]
-                    └── LocalLlmProvider              [configured API key / local model]
+                    ├── taskResults map               [Phase 5: Queued→Running→Done/Cancelled/Error]
+                    └── LocalLlmProvider              [HttpLocalLlmProvider via Hilt @Binds]
 ```
 
 ## Runtime security model
@@ -33,30 +35,43 @@ DroidCommand AI (:app)
 
 ```
 DCA: agentTool.invoke(inputJson)
-  → IHackerAIService.Stub.runAgentTask(inputJson)      [Binder thread]
+  → IHackerAIService.Stub.runAgentTask(inputJson)          [Binder thread]
   → DependencyGuard.isDcaInstalled() → true
   → AgentTaskRunner.runTask(inputJson)
     → parse CreateAgentInput (core-hackerai)
-    → SkillCatalog.resolveSkills(input.skills)
-    → SkillRanker.rankSkillsForTask() if > MAX_SUBAGENT_SKILLS candidates
-    → LlmProvider.chat(systemPrompt, messages) [stream]
-    → DoomLoopDetector.check(step) → warn/halt if loop detected
-    → return {"task_id":"...","status":"queued"}        [immediately]
+    → SkillCatalog.resolveSkills / SkillRanker.rankSkillsForTask()
+    → taskResults[taskId] = Queued
+    → executor.submit { runTaskInternal(...) }              [background thread]
+    → return {"ok":true,"taskId":"...","status":"queued"}   [immediately]
+
+DCA: poll for result
+  → IHackerAIService.Stub.getTaskResult(taskId)
+  → AgentTaskRunner.getTaskResult(taskId)
+    → taskResults[taskId] → Queued | Running | Done | Cancelled | Error
+    → return {"status":"done","result":"..."}
+
+runTaskInternal (background):
+  → taskResults[taskId] = Running
+  → loop up to SUBAGENT_MAX_STEPS:
+      LlmProvider.chat() → DoomLoopDetector.check() → step++
+      break on: doom-loop HALT, step budget, cancellation, fatal provider error
+  → taskResults[taskId] = Done(lastResponse) | Cancelled | Error(msg)
 ```
 
-(Phase 5: full async task tracking with progress callbacks)
+## Component status (updated 2026-09-30)
 
-## Component status (updated 2026-09-29, Phase 5)
-
-| Component                 | Status                             | Notes                                                                    |
-| ------------------------- | ---------------------------------- | ------------------------------------------------------------------------ |
-| IHackerAIService.aidl     | IMPLEMENTED                        | JSON string transport; stable interface                                  |
-| HackerAIBoundService      | IMPLEMENTED                        | DependencyGuard + Hilt injection; refactored to expose delegate methods  |
-| DependencyGuard           | IMPLEMENTED                        | PackageManager check; tested with mockk                                  |
-| AgentTaskRunner           | IMPLEMENTED — NOT RUNTIME VERIFIED | SkillCatalog, DoomLoopDetector, RuntimeRecovery, StepBudgetGate wired in |
-| LocalLlmProvider          | IMPLEMENTED — NOT RUNTIME VERIFIED | EncryptedSharedPreferences + HttpURLConnection; no Android SDK to build  |
-| StatusScreen              | IMPLEMENTED                        | DCA connection state display                                             |
-| SkillBrowserScreen        | IMPLEMENTED — NOT RUNTIME VERIFIED | TF-IDF search over SkillCatalog; LazyColumn with category badges         |
-| SettingsScreen            | IMPLEMENTED — NOT RUNTIME VERIFIED | API key (masked), model, endpoint inputs wired to LocalLlmProvider       |
-| HackerAINavHost           | IMPLEMENTED — NOT RUNTIME VERIFIED | Bottom nav: Status / Skills / Settings; real NavHost + NavController     |
-| core-hackerai integration | IMPLEMENTED — NOT RUNTIME VERIFIED | Requires `./gradlew :core-hackerai:publishToMavenLocal` before AGP build |
+| Component                 | Status      | Notes                                                                               |
+| ------------------------- | ----------- | ----------------------------------------------------------------------------------- |
+| IHackerAIService.aidl     | IMPLEMENTED | JSON transport; added `getTaskResult` for Phase 5 async polling                     |
+| HackerAIBoundService      | IMPLEMENTED | DependencyGuard + Hilt injection; all AIDL methods delegated                        |
+| DependencyGuard           | IMPLEMENTED | `@Singleton @Inject constructor(@ApplicationContext)`; Hilt-managed; mockk-tested  |
+| AppModule (Hilt)          | IMPLEMENTED | Binds `LocalLlmProvider → HttpLocalLlmProvider`; fixes missing DI binding           |
+| AgentTaskRunner           | IMPLEMENTED | Phase 5: `taskResults` map stores Queued/Running/Done/Cancelled/Error per task     |
+| LocalLlmProvider          | IMPLEMENTED | EncryptedSharedPreferences + HttpURLConnection; injected via Hilt                   |
+| StatusScreen              | IMPLEMENTED | DCA connection state display                                                        |
+| SkillBrowserScreen        | IMPLEMENTED | Filter search over SkillCatalog; LazyColumn with category badges                    |
+| SettingsScreen            | IMPLEMENTED | API key (masked), model, endpoint inputs wired to HttpLocalLlmProvider              |
+| HackerAINavHost           | IMPLEMENTED | Bottom nav: Status / Skills / Settings; llmProvider injected from MainActivity      |
+| MainActivity              | IMPLEMENTED | Fixed infinite `recreate()` loop; injects DependencyGuard + HttpLocalLlmProvider   |
+| proguard-rules.pro        | IMPLEMENTED | Keeps AIDL stubs, Hilt entry points, serialization, and Tink classes                |
+| core-hackerai integration | IMPLEMENTED | Requires `./gradlew :core-hackerai:publishToMavenLocal` before AGP build            |

@@ -1,8 +1,14 @@
 package ai.hackerai.companion
 
-import android.content.pm.PackageManager
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
+import javax.inject.Inject
+import javax.inject.Singleton
 
-class DependencyGuard(private val packageManager: PackageManager) {
+@Singleton
+class DependencyGuard @Inject constructor(
+    @ApplicationContext private val context: Context,
+) {
     companion object {
         const val DCA_PACKAGE = "ai.droidcommand.app"
     }
@@ -10,7 +16,7 @@ class DependencyGuard(private val packageManager: PackageManager) {
     fun isDcaInstalled(): Boolean =
         runCatching {
             @Suppress("DEPRECATION")
-            packageManager.getPackageInfo(DCA_PACKAGE, 0)
+            context.packageManager.getPackageInfo(DCA_PACKAGE, 0)
             true
         }.getOrDefault(false)
 }
