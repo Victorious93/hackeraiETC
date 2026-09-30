@@ -21,13 +21,11 @@ Coding agents should start with [AGENTS.md](AGENTS.md).
 
 > **Fleet note:** this repo is one of three companion apps in
 > [`Victorious93/droidcommand-AI`](https://github.com/Victorious93/droidcommand-AI)'s
-> app fleet, alongside `Victorious93/Pentest-Swarm-AI` and
-> `Victorious93/VictorSuite`. DroidCommand AI's `core-hackerai` module is a
-> Kotlin port of this repo's subagent-orchestration logic
-> (`lib/ai/subagents/`). A 2026-09-29c scoping pass found that AIDL is not
-> the right integration shape for a bound-service connection between
-> DroidCommand AI and this app — see that repo's `docs/ARCHITECTURE.md` §8
-> and `docs/AUDIT_2026-09-05.md` (2026-09-29c addendum) for the full record.
+> Android app fleet, alongside `Victorious93/Pentest-Swarm-AI` and
+> `Victorious93/VictorSuite`. The `android/` directory contains the companion
+> APK that exposes HackerAI's agent capabilities to DroidCommand AI via an
+> AIDL bound service. DroidCommand AI's `core-hackerai` module is a Kotlin
+> port of this repo's subagent-orchestration logic (`lib/ai/subagents/`).
 > This note describes that cross-repo relationship only; HackerAI itself
 > remains the standalone product described below.
 

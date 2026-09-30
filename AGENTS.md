@@ -22,20 +22,13 @@ Android app fleet (with `Victorious93/Pentest-Swarm-AI` and
 port of this repo's subagent-orchestration logic under `lib/ai/subagents/`
 (contracts, doom-loop detection, provider-error retry, step-budget gating,
 the Strix skill catalog) — keep that logic's shape mirrorable when changing
-it. **A 2026-09-29c scoping pass in that repo found AIDL isn't the right
-integration shape at all**, not just unbuilt: this repo has no Android
-presence (`packages/desktop` is a desktop-only Tauri wrapper around the
-web app), so there's no on-device component for droidcommand-AI to bind
-to. The real, already-shipped external-control mechanism,
-`packages/local` (`@hackerai/local`), runs the opposite direction — it
-lets *this app's own cloud Agent* drive a local executor, not an external
-caller drive this app. Letting droidcommand-AI delegate a security task
-here for real would need a new, API-key-authenticated way to start/poll
-an Agent run (`/api/agent-long/*` is currently gated by a WorkOS browser
-session cookie only, per `lib/auth/get-user-id.ts`) — a genuine design
-decision for this repo's own maintainers, not implied groundwork. See
-droidcommand-AI's `docs/ARCHITECTURE.md` §8 and `docs/AUDIT_2026-09-05.md`
-(2026-09-29c addendum) for the full record.
+it. The `android/` directory in this repo is the companion APK: it exposes
+HackerAI's agent capabilities to DroidCommand AI via an AIDL bound service
+(`IHackerAIService`). See `android/ARCHITECTURE.md` for the component
+diagram, security model, and runtime data flow. Keep the AIDL contract files
+in `android/app/src/main/aidl/` in sync with the source of truth in
+`droidcommand-AI/core-companion/src/main/aidl/` — a divergent AIDL file
+breaks the binding at runtime.
 
 ## Code Design and Maintenance
 
