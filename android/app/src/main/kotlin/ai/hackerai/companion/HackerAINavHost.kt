@@ -16,9 +16,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -31,13 +29,11 @@ private const val ROUTE_SKILLS = "skills"
 private const val ROUTE_SETTINGS = "settings"
 
 @Composable
-fun HackerAINavHost(isDcaConnected: Boolean = true) {
+fun HackerAINavHost(
+    isDcaConnected: Boolean = true,
+    llmProvider: HttpLocalLlmProvider,
+) {
     val navController = rememberNavController()
-    val context = LocalContext.current
-
-    val llmProvider = remember {
-        HttpLocalLlmProvider(context)
-    }
 
     Scaffold(
         bottomBar = {

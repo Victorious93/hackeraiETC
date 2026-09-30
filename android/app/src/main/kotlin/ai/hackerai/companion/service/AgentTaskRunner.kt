@@ -15,6 +15,7 @@ import ai.droidcommand.hackerai.getSubagentProviderRetryDecision
 import ai.droidcommand.hackerai.shouldStartResultRecovery
 import ai.hackerai.companion.llm.LocalLlmProvider
 import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -27,12 +28,23 @@ import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
 
+private const val MAX_STORED_RESULTS = 200
+
+internal sealed class TaskRecord {
+    object Queued : TaskRecord()
+    object Running : TaskRecord()
+    data class Done(val result: String) : TaskRecord()
+    object Cancelled : TaskRecord()
+    data class Error(val error: String) : TaskRecord()
+}
+
 @Singleton
 class AgentTaskRunner @Inject constructor(
     private val llmProvider: LocalLlmProvider,
 ) {
     internal val executor: ExecutorService = Executors.newCachedThreadPool()
     private val activeTasks = ConcurrentHashMap<String, Pair<Future<*>, AtomicBoolean>>()
+    private val taskResults = ConcurrentHashMap<String, TaskRecord>()
     private val json = Json { ignoreUnknownKeys = true }
 
     fun runTask(inputJson: String): String {
@@ -56,6 +68,8 @@ class AgentTaskRunner @Inject constructor(
 
         val taskId = UUID.randomUUID().toString()
         val cancelled = AtomicBoolean(false)
+        evictOldResultsIfNeeded()
+        taskResults[taskId] = TaskRecord.Queued
         val future = executor.submit { runTaskInternal(taskId, input, rankedSkills, cancelled) }
         activeTasks[taskId] = Pair(future, cancelled)
 
@@ -63,7 +77,7 @@ class AgentTaskRunner @Inject constructor(
     }
 
     /**
-     * Runs a task to completion. Halts when:
+     * Runs a task to completion, storing the result in [taskResults]. Halts when:
      *  - the step budget is exhausted (shouldStartResultRecovery)
      *  - DoomLoopDetector fires HALT (≥5 identical responses)
      *  - the cancelled flag is set
@@ -75,10 +89,12 @@ class AgentTaskRunner @Inject constructor(
         skills: List<SubagentSkill>,
         cancelled: AtomicBoolean,
     ) {
+        taskResults[taskId] = TaskRecord.Running
         val doomLoop = DoomLoopDetector()
         val systemPrompt = buildSystemPrompt(input, skills)
         var step = 0
         var retriesUsed = 0
+        var lastResponse = ""
 
         while (step < SUBAGENT_MAX_STEPS && !cancelled.get()) {
             if (shouldStartResultRecovery(step, SUBAGENT_MAX_STEPS)) break
@@ -96,18 +112,40 @@ class AgentTaskRunner @Inject constructor(
                     Thread.sleep(decision.delayMs)
                     continue
                 }
-                break
+                taskResults[taskId] = TaskRecord.Error(e.message ?: "LLM provider error")
+                activeTasks.remove(taskId)
+                return
             }
 
+            lastResponse = response
             val resultElement = buildJsonObject { put("response", response) }
-            when (val loopResult = doomLoop.check(resultElement)) {
+            when (doomLoop.check(resultElement)) {
                 is DoomLoopCheckResult.Halt -> break
-                is DoomLoopCheckResult.Warning -> { /* warn at ${loopResult.count} identical steps */ }
+                is DoomLoopCheckResult.Warning -> { /* warn at repeated identical steps */ }
                 is DoomLoopCheckResult.Ok -> { /* continue */ }
             }
             step++
         }
+
+        taskResults[taskId] = if (cancelled.get()) TaskRecord.Cancelled else TaskRecord.Done(lastResponse)
         activeTasks.remove(taskId)
+    }
+
+    fun getTaskResult(taskId: String): String {
+        return when (val record = taskResults[taskId]) {
+            null -> errorJson("Unknown task: $taskId")
+            TaskRecord.Queued -> """{"status":"queued"}"""
+            TaskRecord.Running -> """{"status":"running"}"""
+            is TaskRecord.Done -> {
+                val resultEsc = record.result.replace("\\", "\\\\").replace("\"", "\\\"")
+                """{"status":"done","result":"$resultEsc"}"""
+            }
+            TaskRecord.Cancelled -> """{"status":"cancelled"}"""
+            is TaskRecord.Error -> {
+                val errEsc = record.error.replace("\\", "\\\\").replace("\"", "\\\"")
+                """{"status":"error","error":"$errEsc"}"""
+            }
+        }
     }
 
     fun getSkillCatalog(): String = runCatching {
@@ -139,6 +177,16 @@ class AgentTaskRunner @Inject constructor(
         val skillNames = skills.joinToString(", ") { it.name }
         val brief = input.brief?.let { "\n\n$it" } ?: ""
         return "You are a security expert. Available skills: $skillNames$brief"
+    }
+
+    private fun evictOldResultsIfNeeded() {
+        if (taskResults.size < MAX_STORED_RESULTS) return
+        // Remove completed/terminal entries first; they're safe to drop.
+        val terminal = taskResults.entries
+            .filter { (_, v) -> v is TaskRecord.Done || v is TaskRecord.Error || v is TaskRecord.Cancelled }
+            .map { it.key }
+        val toRemove = terminal.take(taskResults.size - MAX_STORED_RESULTS + 1)
+        toRemove.forEach { taskResults.remove(it) }
     }
 
     private fun errorJson(message: String): String {

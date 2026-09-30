@@ -90,4 +90,23 @@ class HackerAIBoundServiceTest {
 
         assertEquals("dca_not_installed", service.healthCheck())
     }
+
+    @Test
+    fun `getTaskResult delegates to runner when DCA installed`() {
+        every { dependencyGuard.isDcaInstalled() } returns true
+        val taskResult = """{"status":"done","result":"scan complete"}"""
+        every { agentTaskRunner.getTaskResult("task-123") } returns taskResult
+
+        assertEquals(taskResult, service.getTaskResult("task-123"))
+    }
+
+    @Test
+    fun `getTaskResult returns error when DCA absent`() {
+        every { dependencyGuard.isDcaInstalled() } returns false
+
+        val result = service.getTaskResult("task-123")
+
+        assertTrue(result.contains("\"ok\":false"))
+        assertTrue(result.contains("DroidCommand AI"))
+    }
 }

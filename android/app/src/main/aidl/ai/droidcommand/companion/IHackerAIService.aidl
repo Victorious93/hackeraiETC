@@ -19,6 +19,11 @@ interface IHackerAIService {
     // Cancel a running task. Fire-and-forget (oneway).
     oneway void cancelTask(String taskId);
 
+    // Poll the result of a previously queued task.
+    // Returns {"status":"queued"|"running"|"done"|"cancelled"|"error","result":"...","error":"..."}.
+    // Returns {"ok":false,"error":"Unknown task"} if the taskId was never issued or has been evicted.
+    String getTaskResult(String taskId);
+
     // Health check. Returns "ok", "busy", or "no_llm_provider".
     String healthCheck();
 }
